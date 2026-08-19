@@ -1,8 +1,8 @@
 """Track resource acquisitions and their state within a CFG.
 
-Phase 2: handles local variable declarations, assignment expressions
-(for reassignment detection), and try-with-resources resource nodes.
-Also detects close calls and argument-passing of tracked resources.
+Handles local variable declarations (both constructors and factory methods),
+assignment expressions (for reassignment detection), and try-with-resources
+resource nodes. Also detects close calls and argument-passing of tracked resources.
 """
 
 from __future__ import annotations
@@ -41,8 +41,16 @@ def _get_var_name_for_declaration(stmt: Node) -> str | None:
     return None
 
 
-def _get_object_creation_type(stmt: Node) -> str | None:
-    """Return the type name from a ``new Xxx(...)`` expression inside *stmt*."""
+def _get_declared_type_name(stmt: Node) -> str | None:
+    """Return the declared type name from a local_variable_declaration or object creation."""
+    # First check explicit declared type (e.g. Connection, FileInputStream, Socket)
+    t_node = stmt.child_by_field_name("type")
+    if t_node is not None:
+        type_text = t_node.text.decode("utf-8")
+        if type_text:
+            return type_text
+
+    # Fallback to object creation expression (new Xxx(...))
     for oce in _find_nodes_by_type(stmt, "object_creation_expression"):
         type_node = oce.child_by_field_name("type")
         if type_node is None:
@@ -54,10 +62,15 @@ def _get_object_creation_type(stmt: Node) -> str | None:
     return None
 
 
-def _get_object_creation_node(stmt: Node) -> Node | None:
-    """Return the ``object_creation_expression`` node inside *stmt*, if any."""
+def _get_acquisition_node(stmt: Node) -> Node:
+    """Return the acquisition node (value expression or statement)."""
+    for child in stmt.children:
+        if child.type == "variable_declarator":
+            val_node = child.child_by_field_name("value")
+            if val_node is not None:
+                return val_node
     nodes = _find_nodes_by_type(stmt, "object_creation_expression")
-    return nodes[0] if nodes else None
+    return nodes[0] if nodes else stmt
 
 
 def _is_inside_safe_wrapper(node: Node, rules: LanguageRules) -> bool:
@@ -103,16 +116,7 @@ def track_resources(
     rules: LanguageRules,
     source_bytes: bytes,
 ) -> list[ResourceHandle]:
-    """Scan a CFG for resource acquisitions and mark their initial state.
-
-    Finds acquisitions in:
-    - ``local_variable_declaration`` with ``new KnownType(...)``
-    - ``assignment_expression`` with ``new KnownType(...)`` (reassignment)
-    - ``resource_specification`` inside try-with-resources (safe-wrapped)
-
-    Also scans for explicit ``.close()`` calls and marks matched resources
-    as CLOSED.
-    """
+    """Scan a CFG for resource acquisitions and mark their initial state."""
     handles: list[ResourceHandle] = []
     handle_by_name: dict[str, ResourceHandle] = {}
 
@@ -161,7 +165,7 @@ def _scan_local_var_decl(
     handle_by_name: dict[str, ResourceHandle],
 ) -> None:
     """Scan a local_variable_declaration for resource acquisitions."""
-    type_name = _get_object_creation_type(stmt)
+    type_name = _get_declared_type_name(stmt)
     if type_name is None or not rules.is_acquisition_type(type_name):
         return
 
@@ -169,10 +173,7 @@ def _scan_local_var_decl(
     if var_name is None:
         return
 
-    acq_node = _get_object_creation_node(stmt)
-    if acq_node is None:
-        return
-
+    acq_node = _get_acquisition_node(stmt)
     is_safe = _is_inside_safe_wrapper(acq_node, rules)
     line = acq_node.start_point[0] + 1
     column = acq_node.start_point[1]
@@ -196,10 +197,7 @@ def _scan_expression_stmt(
     handles: list[ResourceHandle],
     handle_by_name: dict[str, ResourceHandle],
 ) -> None:
-    """Scan an expression_statement for assignment-based acquisitions.
-
-    Handles patterns like: ``fis = new FileInputStream(path);``
-    """
+    """Scan an expression_statement for assignment-based acquisitions."""
     for assign in _find_nodes_by_type(stmt, "assignment_expression"):
         children = assign.children
         if len(children) < 3:
@@ -213,23 +211,13 @@ def _scan_expression_stmt(
 
         var_name = lhs.text.decode("utf-8")
 
-        # Check RHS for object_creation_expression
-        acq_node = None
+        acq_node = rhs
         type_name = None
-        if rhs.type == "object_creation_expression":
-            acq_node = rhs
-        else:
-            oce_nodes = _find_nodes_by_type(rhs, "object_creation_expression")
-            if oce_nodes:
-                acq_node = oce_nodes[0]
-
-        if acq_node is None:
-            continue
-
-        for child in acq_node.children:
-            if child.type == "type_identifier":
-                type_name = child.text.decode("utf-8")
-                break
+        for oce in _find_nodes_by_type(rhs, "object_creation_expression"):
+            for child in oce.children:
+                if child.type == "type_identifier":
+                    type_name = child.text.decode("utf-8")
+                    break
 
         if type_name is None or not rules.is_acquisition_type(type_name):
             continue
@@ -274,7 +262,6 @@ def _scan_resource_spec(
         oce_nodes = _find_nodes_by_type(child, "object_creation_expression")
         if oce_nodes:
             acq_node = oce_nodes[0]
-            # The type from the OCE is more reliable
             for oce_child in acq_node.children:
                 if oce_child.type == "type_identifier":
                     type_name = oce_child.text.decode("utf-8")
