@@ -7,6 +7,7 @@ on:
     branches: [ main, master ]
 
 jobs:
+  # Job 1: Regression Test Suite & Sanity Check on Known-Safe Fixture
   test:
     runs-on: ubuntu-latest
     steps:
@@ -27,8 +28,20 @@ jobs:
         run: |
           pytest -v
 
-      - name: Run Resource Leak Guard action on fixtures
+      - name: Run Resource Leak Guard action on safe fixture
         uses: ./.github/actions/resource-leak-guard
         with:
           path: "tests/fixtures/java/01_no_leak_explicit_close.java"
+          fail-on: "definite"
+
+  # Job 2: Codebase Scanner (Fails build when leaks exist in src/main/java)
+  demo-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Resource Leak Guard action on main codebase
+        uses: ./.github/actions/resource-leak-guard
+        with:
+          path: "src/main/java"
           fail-on: "definite"
