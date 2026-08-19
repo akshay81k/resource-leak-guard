@@ -45,7 +45,7 @@ try:
     data = json.load(sys.stdin)
     for finding in data.get('findings', []):
         level = 'error' if finding['confidence'] == 'DEFINITE' else 'warning'
-        file = finding['file']
+        file = finding['file'].replace('\\\\', '/')
         line = finding['line']
         col = finding['column']
         msg = finding['message']

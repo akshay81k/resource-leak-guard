@@ -136,6 +136,7 @@ def scan(
     all_findings: list[tuple[Finding, str, Optional[str]]] = []
 
     for file_path in files_to_scan:
+        norm_path = str(file_path).replace("\\", "/")
         try:
             tree, source_bytes = parse_file(file_path)
             methods = find_method_declarations(tree)
@@ -143,16 +144,16 @@ def scan(
                 method_name = get_method_name(method)
                 cfg = build_cfg(method)
                 method_findings = detect_leaks(
-                    str(file_path), method_name, cfg, rules, source_bytes
+                    norm_path, method_name, cfg, rules, source_bytes
                 )
                 for f in method_findings:
                     patch = None
                     if generate_patches:
                         if f.confidence == Confidence.DEFINITE:
-                            patch = generate_patch(str(file_path), source_bytes, f)
+                            patch = generate_patch(norm_path, source_bytes, f)
                         elif use_llm:
-                            patch = generate_llm_patch(str(file_path), source_bytes, f)
-                    all_findings.append((f, str(file_path), patch))
+                            patch = generate_llm_patch(norm_path, source_bytes, f)
+                    all_findings.append((f, norm_path, patch))
         except Exception as err:
             if output_format == "text":
                 click.echo(f"Error scanning {file_path}: {err}", err=True)
@@ -215,7 +216,7 @@ def _output_json(all_findings: list[tuple[Finding, str, Optional[str]]]) -> None
     items = []
     for f, file_path, patch in all_findings:
         items.append({
-            "file": file_path,
+            "file": file_path.replace("\\", "/"),
             "line": f.line,
             "column": f.column,
             "method": f.method_name,
