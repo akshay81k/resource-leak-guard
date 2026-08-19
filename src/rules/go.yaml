@@ -1,0 +1,36 @@
+# Rule definitions for Go resource-leak detection.
+
+language: go
+
+acquisitions:
+  - type: os.File
+    module: os
+    factory_methods:
+      - os.Open
+      - os.OpenFile
+      - os.Create
+  - type: net.Conn
+    module: net
+    factory_methods:
+      - net.Dial
+      - net.DialTimeout
+  - type: net.Listener
+    module: net
+    factory_methods:
+      - net.Listen
+  - type: http.Response
+    module: net/http
+    factory_methods:
+      - http.Get
+      - http.Post
+  - type: sql.Rows
+    module: database/sql
+    factory_methods:
+      - DB.Query
+
+releases:
+  - method: Close
+
+safe_wrappers:
+  - ast_node_type: defer_statement
+    description: "defer statement (Go safe idiom)"

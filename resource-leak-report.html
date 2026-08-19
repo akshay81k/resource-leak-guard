@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resource Leak Guard — Summary Dashboard</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-red: #ef4444;
+            --accent-yellow: #f59e0b;
+            --accent-green: #10b981;
+            --border: #334155;
+        }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 2rem;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 1rem;
+            margin-bottom: 2rem;
+        }
+        h1 { margin: 0; font-size: 1.8rem; font-weight: 700; }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .metric-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1.25rem;
+            text-align: center;
+        }
+        .metric-value { font-size: 2rem; font-weight: 800; margin-top: 0.25rem; }
+        .text-red { color: var(--accent-red); }
+        .text-yellow { color: var(--accent-yellow); }
+        .text-green { color: var(--accent-green); }
+
+        .findings-list { display: flex; flex-direction: column; gap: 1rem; }
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1.25rem;
+        }
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 0.75rem;
+        }
+        .badge {
+            padding: 0.25rem 0.6rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .badge-definite { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); border: 1px solid var(--accent-red); }
+        .badge-possible { background: rgba(245, 158, 11, 0.2); color: var(--accent-yellow); border: 1px solid var(--accent-yellow); }
+        .file-info { font-family: monospace; color: var(--text-muted); font-size: 0.9rem; }
+        .detail-row { margin-bottom: 0.4rem; font-size: 0.95rem; }
+        code { background: #0f172a; padding: 0.2rem 0.4rem; border-radius: 0.25rem; font-family: monospace; color: #38bdf8; }
+        
+        .patch-container {
+            margin-top: 1rem;
+            background: #090d16;
+            border: 1px solid var(--border);
+            border-radius: 0.375rem;
+            overflow: hidden;
+        }
+        .patch-title {
+            background: #1e293b;
+            padding: 0.4rem 0.8rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #94a3b8;
+            border-bottom: 1px solid var(--border);
+        }
+        .patch-code { margin: 0; padding: 0.8rem; font-family: monospace; font-size: 0.85rem; overflow-x: auto; color: #e2e8f0; }
+        .no-findings { text-align: center; padding: 3rem; background: var(--card-bg); border-radius: 0.5rem; color: var(--accent-green); font-size: 1.2rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Resource Leak Guard Report</h1>
+        <div style="color: var(--text-muted); font-size: 0.9rem;">Static Analysis Report</div>
+    </div>
+
+    <div class="metrics">
+        <div class="metric-card">
+            <div>Total Findings</div>
+            <div class="metric-value">6</div>
+        </div>
+        <div class="metric-card">
+            <div>Definite Leaks</div>
+            <div class="metric-value text-red">4</div>
+        </div>
+        <div class="metric-card">
+            <div>Possible Leaks</div>
+            <div class="metric-value text-yellow">2</div>
+        </div>
+    </div>
+
+    <h2>Findings Detail</h2>
+    <div class="findings-list">
+        
+        <div class="card definite">
+            <div class="card-header">
+                <span class="badge badge-definite">DEFINITE</span>
+                <span class="file-info">tests\fixtures\java\02_leak_missing_close.java:5:30</span>
+            </div>
+            <div class="card-body">
+                <div class="detail-row"><strong>Method:</strong> <code>leakyMethod</code></div>
+                <div class="detail-row"><strong>Resource:</strong> <code>FileInputStream 'fis'</code></div>
+                <div class="detail-row"><strong>Message:</strong> 'FileInputStream' opened as 'fis' is never closed</div>
+                
+            <div class="patch-container">
+                <div class="patch-title">Suggested Patch</div>
+                <pre class="patch-code"><code>--- a/02_leak_missing_close.java
++++ b/02_leak_missing_close.java
+@@ -2,8 +2,9 @@
+ 
+ public class LeakMissingClose {
+     public void leakyMethod(String path) throws IOException {
+-        FileInputStream fis = new FileInputStream(path);
+-        int data = fis.read();
+-        System.out.println(data);
++        try (FileInputStream fis = new FileInputStream(path)) {
++            int data = fis.read();
++            System.out.println(data);
++        }
+     }
+ }
+</code></pre>
+            </div>
+            
+            </div>
+        </div>
+        
+
+        <div class="card definite">
+            <div class="card-header">
+                <span class="badge badge-definite">DEFINITE</span>
+                <span class="file-info">tests\fixtures\java\04_leak_only_on_exception_path.java:5:30</span>
+            </div>
+            <div class="card-body">
+                <div class="detail-row"><strong>Method:</strong> <code>leakyMethod</code></div>
+                <div class="detail-row"><strong>Resource:</strong> <code>FileInputStream 'fis'</code></div>
+                <div class="detail-row"><strong>Message:</strong> resource is closed on the normal path but may leak if an exception is thrown; wrap in try-with-resources or use a finally block</div>
+                
+            <div class="patch-container">
+                <div class="patch-title">Suggested Patch</div>
+                <pre class="patch-code"><code>--- a/04_leak_only_on_exception_path.java
++++ b/04_leak_only_on_exception_path.java
+@@ -2,8 +2,8 @@
+ 
+ public class LeakOnExceptionPath {
+     public void leakyMethod(String path) throws IOException {
+-        FileInputStream fis = new FileInputStream(path);
+-        int data = fis.read();
+-        fis.close();
++        try (FileInputStream fis = new FileInputStream(path)) {
++            int data = fis.read();
++        }
+     }
+ }
+</code></pre>
+            </div>
+            
+            </div>
+        </div>
+        
+
+        <div class="card possible">
+            <div class="card-header">
+                <span class="badge badge-possible">POSSIBLE</span>
+                <span class="file-info">tests\fixtures\java\06_possible_leak_conditional_reassignment.java:5:30</span>
+            </div>
+            <div class="card-body">
+                <div class="detail-row"><strong>Method:</strong> <code>riskyMethod</code></div>
+                <div class="detail-row"><strong>Resource:</strong> <code>FileInputStream 'fis'</code></div>
+                <div class="detail-row"><strong>Message:</strong> variable is conditionally reassigned; original resource may leak; resource is closed on the normal path but may leak if an exception is thrown; wrap in try-with-resources or use a finally block</div>
+                
+            </div>
+        </div>
+        
+
+        <div class="card possible">
+            <div class="card-header">
+                <span class="badge badge-possible">POSSIBLE</span>
+                <span class="file-info">tests\fixtures\java\07_possible_leak_passed_to_helper.java:5:30</span>
+            </div>
+            <div class="card-body">
+                <div class="detail-row"><strong>Method:</strong> <code>riskyMethod</code></div>
+                <div class="detail-row"><strong>Resource:</strong> <code>FileInputStream 'fis'</code></div>
+                <div class="detail-row"><strong>Message:</strong> resource is passed to another method which may close it; 'FileInputStream' may not be closed on all paths</div>
+                
+            </div>
+        </div>
+        
+
+        <div class="card definite">
+            <div class="card-header">
+                <span class="badge badge-definite">DEFINITE</span>
+                <span class="file-info">tests\fixtures\java\phase1_explicit_close.java:5:30</span>
+            </div>
+            <div class="card-body">
+                <div class="detail-row"><strong>Method:</strong> <code>safeMethod</code></div>
+                <div class="detail-row"><strong>Resource:</strong> <code>FileInputStream 'fis'</code></div>
+                <div class="detail-row"><strong>Message:</strong> resource is closed on the normal path but may leak if an exception is thrown; wrap in try-with-resources or use a finally block</div>
+                
+            <div class="patch-container">
+                <div class="patch-title">Suggested Patch</div>
+                <pre class="patch-code"><code>--- a/phase1_explicit_close.java
++++ b/phase1_explicit_close.java
+@@ -2,8 +2,8 @@
+ 
+ public class ExplicitClose {
+     public void safeMethod(String path) throws IOException {
+-        FileInputStream fis = new FileInputStream(path);
+-        int data = fis.read();
+-        fis.close();
++        try (FileInputStream fis = new FileInputStream(path)) {
++            int data = fis.read();
++        }
+     }
+ }
+</code></pre>
+            </div>
+            
+            </div>
+        </div>
+        
+
+        <div class="card definite">
+            <div class="card-header">
+                <span class="badge badge-definite">DEFINITE</span>
+                <span class="file-info">tests\fixtures\java\phase1_leaky_method.java:5:30</span>
+            </div>
+            <div class="card-body">
+                <div class="detail-row"><strong>Method:</strong> <code>leakyMethod</code></div>
+                <div class="detail-row"><strong>Resource:</strong> <code>FileInputStream 'fis'</code></div>
+                <div class="detail-row"><strong>Message:</strong> 'FileInputStream' opened as 'fis' is never closed</div>
+                
+            <div class="patch-container">
+                <div class="patch-title">Suggested Patch</div>
+                <pre class="patch-code"><code>--- a/phase1_leaky_method.java
++++ b/phase1_leaky_method.java
+@@ -2,8 +2,9 @@
+ 
+ public class LeakyMethod {
+     public void leakyMethod(String path) throws IOException {
+-        FileInputStream fis = new FileInputStream(path);
+-        int data = fis.read();
+-        System.out.println(data);
++        try (FileInputStream fis = new FileInputStream(path)) {
++            int data = fis.read();
++            System.out.println(data);
++        }
+     }
+ }
+</code></pre>
+            </div>
+            
+            </div>
+        </div>
+        
+    </div>
+</body>
+</html>

@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "resource-leak-guard"
+version = "0.1.0"
+description = "Static analysis tool for detecting resource leaks in source code"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "tree-sitter==0.24.0",
+    "tree-sitter-java==0.23.5",
+    "pyyaml>=6.0",
+    "click>=8.0",
+]
+
+[project.scripts]
+resource-leak-guard = "src.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]

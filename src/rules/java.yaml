@@ -1,0 +1,89 @@
+# Rule definitions for Java resource-leak detection.
+#
+# Each section describes patterns the analyzer uses to identify resource
+# acquisitions, release calls, and safe-wrapper constructs.
+#
+# Format documentation: docs/rule-file-format.md
+
+language: java
+
+# Types whose constructors (or factory methods) produce a closeable resource.
+# Each entry specifies the type name as seen in source code.
+acquisitions:
+  # java.io
+  - type: FileInputStream
+    module: java.io
+  - type: FileOutputStream
+    module: java.io
+  - type: FileReader
+    module: java.io
+  - type: FileWriter
+    module: java.io
+  - type: BufferedReader
+    module: java.io
+  - type: BufferedWriter
+    module: java.io
+  - type: BufferedInputStream
+    module: java.io
+  - type: BufferedOutputStream
+    module: java.io
+  - type: InputStreamReader
+    module: java.io
+  - type: OutputStreamWriter
+    module: java.io
+  - type: PrintWriter
+    module: java.io
+  - type: PrintStream
+    module: java.io
+  - type: RandomAccessFile
+    module: java.io
+  - type: ObjectInputStream
+    module: java.io
+  - type: ObjectOutputStream
+    module: java.io
+
+  # java.net
+  - type: Socket
+    module: java.net
+  - type: ServerSocket
+    module: java.net
+
+  # java.sql
+  - type: Connection
+    module: java.sql
+    factory_methods:
+      - DriverManager.getConnection
+  - type: Statement
+    module: java.sql
+    factory_methods:
+      - Connection.createStatement
+  - type: PreparedStatement
+    module: java.sql
+    factory_methods:
+      - Connection.prepareStatement
+  - type: ResultSet
+    module: java.sql
+    factory_methods:
+      - Statement.executeQuery
+      - PreparedStatement.executeQuery
+
+  # java.nio
+  - type: FileChannel
+    module: java.nio.channels
+  - type: SocketChannel
+    module: java.nio.channels
+  - type: ServerSocketChannel
+    module: java.nio.channels
+
+# Method names that release / close a resource.
+releases:
+  - method: close
+  - method: shutdown
+  - method: disconnect
+
+# AST patterns that indicate the resource is safely managed.
+safe_wrappers:
+  # try-with-resources: the AST node type is "try_with_resources_statement"
+  # and the resource variable appears inside a "resource" node.
+  - ast_node_type: try_with_resources_statement
+    description: "try-with-resources (Java 7+)"

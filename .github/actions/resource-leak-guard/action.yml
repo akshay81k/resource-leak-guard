@@ -1,0 +1,43 @@
+name: "Resource Leak Guard"
+description: "Statically analyze Java code to detect unclosed resource leaks and suggest patches."
+author: "Resource Leak Guard"
+
+inputs:
+  path:
+    description: "Directory or file path to scan."
+    required: false
+    default: "."
+  fail-on:
+    description: "Minimum confidence level to fail the build (definite or possible)."
+    required: false
+    default: "definite"
+  diff-only:
+    description: "Scan only changed files in the PR."
+    required: false
+    default: "false"
+
+outputs:
+  findings-count:
+    description: "Total number of resource leak findings detected."
+    value: ${{ steps.scan.outputs.findings_count }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+
+    - name: Run Resource Leak Guard Scan
+      id: scan
+      shell: bash
+      run: |
+        chmod +x .github/actions/resource-leak-guard/entrypoint.sh
+        .github/actions/resource-leak-guard/entrypoint.sh "${{ inputs.path }}" "${{ inputs.fail-on }}" "${{ inputs.diff-only }}"
