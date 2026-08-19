@@ -8,14 +8,15 @@ from __future__ import annotations
 
 import os
 from typing import Optional
-from dotenv import load_dotenv
 
-from google import genai
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 from src.models import Finding
 from src.patch.diff_writer import generate_patch
-
-
-load_dotenv()
 
 
 def generate_llm_patch(
@@ -38,6 +39,7 @@ def generate_llm_patch(
         return None
 
     try:
+        from google import genai
         client = genai.Client(api_key=api_key)
         source_text = source_bytes.decode("utf-8")
 
@@ -105,5 +107,5 @@ Instructions:
         )
         return "".join(diff_lines) if diff_lines else None
 
-    except Exception as err:
+    except Exception:
         return None
